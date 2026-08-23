@@ -1,0 +1,12 @@
+create extension if not exists pgcrypto;
+create table if not exists cases (id uuid primary key default gen_random_uuid(), title text not null, status text not null default 'active', created_at timestamptz not null default now(), updated_at timestamptz not null default now());
+create table if not exists entities (id uuid primary key default gen_random_uuid(), type text not null, canonical_label text not null, identifiers jsonb not null default '{}', created_at timestamptz not null default now(), updated_at timestamptz not null default now());
+create table if not exists case_entities (case_id uuid not null references cases(id) on delete cascade, entity_id uuid not null references entities(id) on delete cascade, primary key(case_id,entity_id));
+create table if not exists sources (id uuid primary key default gen_random_uuid(), kind text not null, provider text not null, url text, observed_at timestamptz, retrieved_at timestamptz not null default now(), freshness_at timestamptz);
+create table if not exists evidence (id uuid primary key default gen_random_uuid(), source_id uuid not null references sources(id), observation text not null, raw_reference text, confidence numeric(5,4) not null default 0, is_inference boolean not null default false, created_at timestamptz not null default now());
+create table if not exists evidence_entities (evidence_id uuid not null references evidence(id) on delete cascade, entity_id uuid not null references entities(id) on delete cascade, primary key(evidence_id,entity_id));
+create table if not exists relationships (id uuid primary key default gen_random_uuid(), from_entity_id uuid not null references entities(id), to_entity_id uuid not null references entities(id), type text not null, confidence numeric(5,4) not null default 0, created_at timestamptz not null default now());
+create table if not exists relationship_evidence (relationship_id uuid not null references relationships(id) on delete cascade, evidence_id uuid not null references evidence(id) on delete cascade, primary key(relationship_id,evidence_id));
+create index if not exists idx_entities_type_label on entities(type,canonical_label);
+create index if not exists idx_evidence_source on evidence(source_id);
+create index if not exists idx_relationships_from_to on relationships(from_entity_id,to_entity_id);

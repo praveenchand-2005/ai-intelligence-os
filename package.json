@@ -1,0 +1,1 @@
+{"name":"ai-intelligence-os","private":true,"version":"0.1.0","description":"AI-native intelligence and investigation platform","workspaces":["apps/*","packages/*"],"scripts":{"dev":"node apps/api/server.mjs","start":"node apps/api/server.mjs","test":"node --test","lint":"node --check apps/api/server.mjs","typecheck":"node --check apps/api/server.mjs"},"engines":{"node":">=20"}}
