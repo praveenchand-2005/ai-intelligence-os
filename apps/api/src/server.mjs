@@ -1,39 +1,18 @@
 import http from 'node:http';
-import { randomUUID } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { investigateDomain } from './providers/domain.mjs';
-import { investigateEmail } from './providers/email.mjs';
-
-const port = Number(process.env.PORT || 8787);
-const webRoot = join(fileURLToPath(new URL('../../web/', import.meta.url)));
-const cases = new Map();
-const contentTypes = {'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8'};
-const json = (res,status,body) => { res.writeHead(status,{'content-type':'application/json; charset=utf-8','cache-control':'no-store'}); res.end(JSON.stringify(body)); };
-const read = req => new Promise((resolve,reject)=>{let b='';req.on('data',c=>b+=c);req.on('end',()=>{try{resolve(b?JSON.parse(b):{})}catch(e){reject(e)}});req.on('error',reject)});
-const staticFile = async (res, pathname) => { try { const safe=normalize(pathname).replace(/^([.][.][/\\])+/, ''); const file=join(webRoot, safe==='/'? 'index.html':safe.replace(/^[/\\]/,'')); const body=await readFile(file); res.writeHead(200,{'content-type':contentTypes[extname(file)]||'application/octet-stream'}); res.end(body); return true; } catch { return false; } };
-const looksLikeDomain = value => /^(?:https?:\/\/)?(?:[a-z0-9-]+\.)+[a-z]{2,}$/i.test(String(value).trim());
-const looksLikeEmail = value => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(value).trim());
-const runInvestigation = async target => {
-  if (looksLikeDomain(target)) { const result=await investigateDomain(target); return {kind:'domain',result,evidence:result.evidence}; }
-  if (looksLikeEmail(target)) { const result=await investigateEmail(target); return {kind:'email',result,evidence:result.evidence}; }
-  return {kind:'identifier',result:null,evidence:[]};
-};
-const server = http.createServer(async (req,res)=>{
-  const url = new URL(req.url || '/', `http://${req.headers.host || 'localhost'}`);
-  if (req.method === 'GET' && url.pathname === '/api/health') return json(res,200,{ok:true,service:'aio-api',time:new Date().toISOString(),dataMode:'live-provider'});
-  if (req.method === 'GET' && url.pathname === '/api/providers') return json(res,200,{items:[{id:'iana-rdap',name:'IANA RDAP bootstrap',status:'operational',capabilities:['domain-registration']},{id:'cloudflare-doh',name:'Cloudflare DNS-over-HTTPS',status:'operational',capabilities:['A','AAAA','MX','NS','TXT']},{id:'email-dns',name:'Node DNS resolver',status:'operational',capabilities:['email-domain-resolution']}]});
-  if (req.method === 'GET' && url.pathname === '/api/cases') return json(res,200,{items:[...cases.values()]});
-  if (req.method === 'POST' && url.pathname === '/api/investigations') {
-    try { const body=await read(req); const target=String(body.target||'').trim(); if(!target)return json(res,400,{error:'target is required'}); const item={id:randomUUID(),target,status:'collecting',createdAt:new Date().toISOString(),evidence:[],findings:[],sources:[]}; cases.set(item.id,item);
-      try { const collected=await runInvestigation(target); item.kind=collected.kind; item.result=collected.result; item.evidence=collected.evidence; item.sources=[...new Set(collected.evidence.map(e=>e.provider))]; item.status='completed'; item.completedAt=new Date().toISOString(); }
-      catch(error){ item.status='degraded'; item.error='Provider collection failed'; item.providerError=error instanceof Error ? error.message : String(error); }
-      return json(res,202,item);
-    } catch { return json(res,400,{error:'invalid JSON'}); }
-  }
-  if (req.method === 'GET' && url.pathname.startsWith('/api/investigations/')) { const item=cases.get(url.pathname.split('/').pop()); if(!item)return json(res,404,{error:'not found'}); return json(res,200,item); }
-  if (req.method === 'GET' && await staticFile(res,url.pathname)) return;
-  json(res,404,{error:'not found'});
-});
-server.listen(port,()=>console.log(`AIO listening on ${port}`));
+import { createCase, updateCase, getCase, listCases } from './store.mjs';
+import { collect } from './investigation.mjs';
+const port=Number(process.env.PORT||8787); const webRoot=join(fileURLToPath(new URL('../../web/',import.meta.url)));
+const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8'};
+const json=(res,s,b)=>{res.writeHead(s,{'content-type':'application/json; charset=utf-8','cache-control':'no-store'});res.end(JSON.stringify(b));};
+const read=req=>new Promise((resolve,reject)=>{let b='';req.on('data',c=>b+=c);req.on('end',()=>{try{resolve(b?JSON.parse(b):{})}catch(e){reject(e)}});req.on('error',reject)});
+const staticFile=async(res,p)=>{try{const safe=normalize(p).replace(/^([.][.][/\\])+/, '');const f=join(webRoot,safe==='/'?'index.html':safe.replace(/^[/\\]/,''));res.writeHead(200,{'content-type':types[extname(f)]||'application/octet-stream'});res.end(await readFile(f));return true}catch{return false}};
+const server=http.createServer(async(req,res)=>{const u=new URL(req.url||'/',`http://${req.headers.host||'localhost'}`);
+ if(req.method==='GET'&&u.pathname==='/api/health')return json(res,200,{ok:true,service:'aio-api',mode:'live'});
+ if(req.method==='GET'&&u.pathname==='/api/providers')return json(res,200,{items:[{id:'iana-rdap',name:'IANA RDAP',status:'operational'},{id:'cloudflare-doh',name:'Cloudflare DNS-over-HTTPS',status:'operational'},{id:'email-dns',name:'Email DNS resolver',status:'operational'}]});
+ if(req.method==='GET'&&u.pathname==='/api/cases')return json(res,200,{items:listCases()});
+ if(req.method==='POST'&&u.pathname==='/api/investigations'){try{const body=await read(req);const target=String(body.target||'').trim();if(!target)return json(res,400,{error:'target is required'});const item=createCase({target,status:'collecting',evidence:[],findings:[],sources:[]});try{const r=await collect(target);return json(res,202,updateCase(item.id,{status:'completed',kind:r.kind,result:r.result,evidence:r.evidence,sources:[...new Set(r.evidence.map(e=>e.provider))],message:r.message,completedAt:new Date().toISOString()}));}catch(e){return json(res,202,updateCase(item.id,{status:'degraded',error:'Provider collection failed'}));}}catch{return json(res,400,{error:'invalid JSON'})}}
+ if(req.method==='GET'&&u.pathname.startsWith('/api/investigations/')){const x=getCase(u.pathname.split('/').pop());return x?json(res,200,x):json(res,404,{error:'not found'})}
+ if(req.method==='GET'&&await staticFile(res,u.pathname))return;return json(res,404,{error:'not found'});});server.listen(port,()=>console.log(`AIO listening on ${port}`));
