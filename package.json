@@ -1,0 +1,1 @@
+{"name":"ai-intelligence-os","private":true,"version":"0.1.0","description":"AI-native intelligence and investigation platform","workspaces":["apps/*","packages/*"],"scripts":{"dev":"echo 'workspace bootstrap pending'","test":"echo 'tests pending'","lint":"echo 'lint pending'","typecheck":"echo 'typecheck pending'"},"engines":{"node":">=20"}}
