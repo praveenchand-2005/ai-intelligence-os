@@ -1,28 +1,34 @@
-import type { EvidenceItem, InvestigationCase, Relationship } from '../../domain/src';
+import type { Evidence, InvestigationCase, Relationship, Finding } from '../../domain/src';
+
+export type AgentRole = 'orchestrator' | 'identity' | 'business' | 'social' | 'image' | 'security' | 'evidence' | 'contradiction' | 'report';
 
 export interface InvestigationTask {
   id: string;
   caseId: string;
+  role: AgentRole;
   objective: string;
   entityIds: string[];
-}
-
-export interface GroundedFinding {
-  statement: string;
   evidenceIds: string[];
-  confidence: number;
-  classification: 'observation' | 'correlation' | 'inference';
 }
 
 export interface AgentContext {
   caseData: InvestigationCase;
-  evidence: EvidenceItem[];
+  evidence: Evidence[];
   relationships: Relationship[];
 }
 
+export interface AgentResult {
+  findings: Finding[];
+  proposedTasks: InvestigationTask[];
+  citations: string[];
+}
+
 export interface InvestigationAgent {
-  id: string;
-  role: string;
-  plan(context: AgentContext): Promise<InvestigationTask[]>;
-  analyze(context: AgentContext, task: InvestigationTask): Promise<GroundedFinding[]>;
+  role: AgentRole;
+  run(task: InvestigationTask, context: AgentContext): Promise<AgentResult>;
+}
+
+export function assertGroundedFinding(finding: Finding): void {
+  if (finding.evidenceIds.length === 0) throw new Error(`Finding ${finding.id} is not grounded in evidence`);
+  if (finding.confidence < 0 || finding.confidence > 1) throw new Error(`Finding ${finding.id} has invalid confidence`);
 }
