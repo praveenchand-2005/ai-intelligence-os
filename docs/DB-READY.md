@@ -1,0 +1,1 @@
+Database persistence is implemented behind DATABASE_URL. The deployment can safely run without it during local development; production should inject the private PostgreSQL connection string through the hosting environment.
