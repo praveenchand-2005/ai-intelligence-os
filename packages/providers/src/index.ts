@@ -1,4 +1,4 @@
-import type { EntityType, EvidenceItem, EvidenceSource } from '../../domain/src';
+import type { EntityType, Evidence, EvidenceSource } from '../../domain/src';
 
 export interface ProviderHealth {
   provider: string;
@@ -14,13 +14,15 @@ export interface ProviderContext {
   signal: AbortSignal;
 }
 
+export interface ProviderResult {
+  sources: EvidenceSource[];
+  evidence: Evidence[];
+}
+
 export interface InvestigationProvider {
   id: string;
   name: string;
   supportedEntityTypes: readonly EntityType[];
   health(): Promise<ProviderHealth>;
-  investigate(entity: { type: EntityType; value: string }, context: ProviderContext): Promise<{
-    sources: EvidenceSource[];
-    evidence: EvidenceItem[];
-  }>;
+  investigate(entity: { type: EntityType; value: string }, context: ProviderContext): Promise<ProviderResult>;
 }
