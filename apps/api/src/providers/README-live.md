@@ -1,0 +1,1 @@
+Live provider verification references are maintained in `docs/LIVE-SOURCES.md`. Do not hard-code a stale TLD registry or provider endpoint list into the product when an authoritative bootstrap/source registry is available.
