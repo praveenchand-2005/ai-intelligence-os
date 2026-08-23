@@ -17,4 +17,6 @@ jobs:
       - name: Validate manifests
         run: node -e "const p=require('./package.json'); if(!p.workspaces) process.exit(1); console.log('workspace manifest ok')"
       - name: API syntax check
-        run: node --check apps/api/src/server.mjs
+        run: node --check apps/api/src/server.mjs && node --check apps/api/src/providers/domain.mjs && node --check apps/api/src/providers/email.mjs
+      - name: Provider contract tests
+        run: node --test apps/api/test/providers.test.mjs
