@@ -1,0 +1,18 @@
+import pg from 'pg';
+const { Pool } = pg;
+let pool;
+export function dbEnabled(){ return Boolean(process.env.DATABASE_URL); }
+function getPool(){
+ if(!process.env.DATABASE_URL) return null;
+ if(!pool) pool=new Pool({connectionString:process.env.DATABASE_URL,ssl:process.env.DATABASE_URL.includes('render.com')?{rejectUnauthorized:false}:undefined,max:5,idleTimeoutMillis:30000});
+ return pool;
+}
+export async function initDb(){
+ const p=getPool(); if(!p) return false;
+ await p.query(`create table if not exists investigation_cases (id uuid primary key,target text not null,status text not null,kind text,result jsonb,evidence jsonb not null default '[]',sources jsonb not null default '[]',findings jsonb not null default '[]',error text,created_at timestamptz not null,updated_at timestamptz not null,completed_at timestamptz); create index if not exists investigation_cases_created_idx on investigation_cases(created_at desc); create table if not exists evidence_items (id text primary key,case_id uuid not null references investigation_cases(id) on delete cascade,provider text not null,title text not null,summary text not null,source_url text,observed_at timestamptz,retrieved_at timestamptz not null,payload jsonb); create index if not exists evidence_case_idx on evidence_items(case_id);`);
+ return true;
+}
+export async function saveCase(c){const p=getPool();if(!p)return c;await p.query(`insert into investigation_cases(id,target,status,kind,result,evidence,sources,findings,error,created_at,updated_at,completed_at) values($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) on conflict(id) do update set target=excluded.target,status=excluded.status,kind=excluded.kind,result=excluded.result,evidence=excluded.evidence,sources=excluded.sources,findings=excluded.findings,error=excluded.error,updated_at=excluded.updated_at,completed_at=excluded.completed_at`,[c.id,c.target,c.status,c.kind??null,c.result??null,JSON.stringify(c.evidence??[]),JSON.stringify(c.sources??[]),JSON.stringify(c.findings??[]),c.error??null,c.createdAt,c.updatedAt,c.completedAt??null]);
+ for(const e of c.evidence??[]) await p.query(`insert into evidence_items(id,case_id,provider,title,summary,source_url,observed_at,retrieved_at,payload) values($1,$2,$3,$4,$5,$6,$7,$8,$9) on conflict(id) do update set summary=excluded.summary,retrieved_at=excluded.retrieved_at,payload=excluded.payload`,[e.id,c.id,e.provider,e.title,e.summary,e.url??null,e.observedAt??null,e.retrievedAt,new Date().toISOString(),JSON.stringify(e)]); return c;}
+export async function listPersistedCases(){const p=getPool();if(!p)return null;const r=await p.query('select id,target,status,kind,result,evidence,sources,findings,error,created_at as "createdAt",updated_at as "updatedAt",completed_at as "completedAt" from investigation_cases order by created_at desc limit 200');return r.rows;}
+export async function getPersistedCase(id){const p=getPool();if(!p)return null;const r=await p.query('select id,target,status,kind,result,evidence,sources,findings,error,created_at as "createdAt",updated_at as "updatedAt",completed_at as "completedAt" from investigation_cases where id=$1',[id]);return r.rows[0]??null;}
