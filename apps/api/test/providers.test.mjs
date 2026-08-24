@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { investigateDomain } from '../../src/providers/domain.mjs';
+import { investigateDomain } from '../src/providers/domain.mjs';
 
 test('domain provider normalizes URL and returns evidence', async () => {
   const result = await investigateDomain('https://example.com/');
