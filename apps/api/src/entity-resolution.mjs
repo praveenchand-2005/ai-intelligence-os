@@ -1,0 +1,4 @@
+const norm=s=>String(s||'').toLowerCase().normalize('NFKC').replace(/[^a-z0-9]+/g,' ').trim();
+function tokenSet(s){return new Set(norm(s).split(/\s+/).filter(Boolean))}
+function overlap(a,b){const A=tokenSet(a),B=tokenSet(b);if(!A.size||!B.size)return 0;let n=0;for(const x of A)if(B.has(x))n++;return n/Math.max(A.size,B.size)}
+export function resolveEntity(target,evidence=[]){const candidates=new Map();for(const e of evidence){const key=norm(e.entity||e.title||'');if(!key)continue;const c=candidates.get(key)||{label:e.entity||e.title,sources:[],score:0};c.sources.push(e.provider);c.score=Math.max(c.score,overlap(target,c.label));candidates.set(key,c)}const ranked=[...candidates.values()].sort((a,b)=>b.score-a.score).map(c=>({...c,confidence:c.score>=.8?'high':c.score>=.5?'medium':'low'}));return {canonicalTarget:target,candidates:ranked,confidence:ranked[0]?.confidence||'low'};}
