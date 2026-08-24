@@ -4,6 +4,7 @@ import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createCase, updateCase, getCase, listCases } from './store.mjs';
 import { collect } from './investigation.mjs';
+import { buildGraph } from './graph.mjs';
 import { initDb, dbEnabled } from './db.mjs';
 import { register, login, authHeader } from './auth.mjs';
 const port=Number(process.env.PORT||8787);const webRoot=join(fileURLToPath(new URL('../../web/',import.meta.url)));const types={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json; charset=utf-8'};
@@ -18,6 +19,7 @@ if(req.method==='GET'&&u.pathname==='/api/auth/me'){const s=await authHeader(req
 if(req.method==='GET'&&u.pathname==='/api/providers')return json(res,200,{items:[{id:'iana-rdap',name:'IANA RDAP',status:'operational'},{id:'cloudflare-doh',name:'Cloudflare DNS-over-HTTPS',status:'operational'},{id:'email-dns',name:'Email DNS resolver',status:'operational'}]});
 if(req.method==='GET'&&u.pathname==='/api/cases'){if(!await authHeader(req))return json(res,401,{error:'authentication required'});return json(res,200,{items:await listCases()})}
 if(req.method==='POST'&&u.pathname==='/api/investigations'){if(!await authHeader(req))return json(res,401,{error:'authentication required'});try{const body=await read(req),target=String(body.target||'').trim();if(!target)return json(res,400,{error:'target is required'});const item=await createCase({target,status:'collecting',evidence:[],findings:[],sources:[]});try{const r=await collect(target);return json(res,202,await updateCase(item.id,{status:'completed',kind:r.kind,result:r.result,evidence:r.evidence,sources:[...new Set(r.evidence.map(e=>e.provider))],message:r.message,completedAt:new Date().toISOString()}))}catch{return json(res,202,await updateCase(item.id,{status:'degraded',error:'Provider collection failed'}))}}catch{return json(res,400,{error:'invalid JSON'})}}
+if(req.method==='GET'&&u.pathname.startsWith('/api/investigations/')&&u.pathname.endsWith('/graph')){if(!await authHeader(req))return json(res,401,{error:'authentication required'});const id=u.pathname.split('/')[3];const item=await getCase(id);return item?json(res,200,buildGraph(item)):json(res,404,{error:'not found'})}
 if(req.method==='GET'&&u.pathname.startsWith('/api/investigations/')){if(!await authHeader(req))return json(res,401,{error:'authentication required'});const item=await getCase(u.pathname.split('/').pop());return item?json(res,200,item):json(res,404,{error:'not found'})}
 if(req.method==='GET'&&await staticFile(res,u.pathname))return;return json(res,404,{error:'not found'})});
 initDb().then(()=>server.listen(port,()=>console.log(`AIO listening on ${port}`))).catch(e=>{console.error('db init failed',e);server.listen(port,()=>console.log(`AIO listening on ${port} without database`))});
