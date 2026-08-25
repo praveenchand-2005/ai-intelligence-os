@@ -1,0 +1,5 @@
+const health=new Map();
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+export function providerHealth(){return [...health.entries()].map(([provider,v])=>({provider,...v}))}
+export async function withProviderReliability(provider,fn,{timeoutMs=8000,retries=2,baseDelayMs=250}={}){const started=Date.now();let last;for(let attempt=0;attempt<=retries;attempt++){try{const result=await Promise.race([Promise.resolve().then(fn),new Promise((_,rej)=>setTimeout(()=>rej(new Error(`provider timeout after ${timeoutMs}ms`)),timeoutMs))]);const old=health.get(provider)||{successes:0,failures:0};health.set(provider,{...old,successes:old.successes+1,lastSuccessAt:new Date().toISOString(),lastLatencyMs:Date.now()-started,lastError:null});return result}catch(e){last=e;const old=health.get(provider)||{successes:0,failures:0};health.set(provider,{...old,failures:old.failures+1,lastFailureAt:new Date().toISOString(),lastLatencyMs:Date.now()-started,lastError:e.message});if(attempt<retries)await sleep(baseDelayMs*Math.pow(2,attempt))}}throw last}
+export function resetProviderHealth(){health.clear()}

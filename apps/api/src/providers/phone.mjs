@@ -1,0 +1,3 @@
+const now=()=>new Date().toISOString();
+const e164=/^\+[1-9]\d{7,14}$/;
+export async function investigatePhone(value){const phone=String(value).trim();if(!e164.test(phone))throw Error('Phone must be E.164 format');const country=phone.startsWith('+91')?'IN':phone.startsWith('+1')?'US':null;return {phone,country,format:'E.164',evidence:[{id:`phone-format-${phone.replace(/\D/g,'')}`,provider:'AIO validation engine',title:'Phone number format',summary:`${phone} is syntactically valid E.164 notation.${country?` Country prefix mapped to ${country}.`:''}`,url:'https://www.itu.int/rec/T-REC-E.164',retrievedAt:now(),observedAt:now()}]};}

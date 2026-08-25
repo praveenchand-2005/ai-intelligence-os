@@ -1,0 +1,4 @@
+const system=`You are an evidence-grounded intelligence analyst. Never invent facts. Distinguish observations from correlations and inferences. Every factual claim must reference supplied evidence. If evidence is insufficient, say so.`;
+export function buildAnalysisPrompt(caseData){return {system,input:{target:caseData.target,evidence:(caseData.evidence||[]).map(e=>({id:e.id,provider:e.provider,title:e.title,summary:e.summary,url:e.url,retrievedAt:e.retrievedAt}))},instructions:'Return JSON with summary, observations, correlations, inferences, gaps, and confidence. Cite evidence IDs for every claim.'};}
+export function validateAnalysis(a,evidence){const ids=new Set((evidence||[]).map(e=>e.id));const claims=[...(a?.observations||[]),...(a?.correlations||[]),...(a?.inferences||[])];return claims.every(c=>(c.evidenceIds||[]).length>0&&c.evidenceIds.every(id=>ids.has(id)));}
+export { system };

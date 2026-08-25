@@ -1,15 +1,4 @@
-import { investigateDomain } from './providers/domain.mjs';
-import { investigateEmail } from './providers/email.mjs';
-import { investigateWebsite } from './providers/website.mjs';
-import { investigateUsername } from './providers/username.mjs';
-const email=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const domain=/^(?:https?:\/\/)?(?:[a-z0-9-]+\.)+[a-z]{2,}$/i;
-const username=/^@?[a-zA-Z0-9._-]{2,64}$/;
-export async function collect(target){
- const value=String(target).trim();
- if(email.test(value)){const result=await investigateEmail(value);return {kind:'email',result,evidence:result.evidence};}
- if(/^https?:\/\//i.test(value)){const result=await investigateWebsite(value);return {kind:'website',result,evidence:result.evidence};}
- if(domain.test(value)){const result=await investigateDomain(value);return {kind:'domain',result,evidence:result.evidence};}
- if(username.test(value)){const result=await investigateUsername(value);return {kind:'username',result,evidence:result.evidence};}
- return {kind:'identifier',result:null,evidence:[],message:'No live provider is enabled for this identifier yet.'};
-}
+import { resolveEntity } from './entity-resolution.mjs';import { fanOut } from './orchestrator.mjs';
+const email=/^[^\s@]+@[^\s@]+\.[^\s@]+$/;const domain=/^(?:https?:\/\/)?(?:[a-z0-9-]+\.)+[a-z]{2,}$/i;const username=/^@?[a-zA-Z0-9._-]{2,64}$/;const ipv4=/^(?:\d{1,3}\.){3}\d{1,3}$/;const phone=/^\+[1-9]\d{7,14}$/;
+function classify(value){if(email.test(value))return 'email';if(/^https?:\/\//i.test(value))return 'website';if(ipv4.test(value))return 'ip';if(phone.test(value))return 'phone';if(domain.test(value))return 'domain';if(username.test(value))return 'username';return 'person'}
+export async function collect(target){const value=String(target).trim();if(!value)throw new Error('target is required');const kind=classify(value);const out=await fanOut(kind,value);return {kind,result:{target:value,entityResolution:resolveEntity(value,out.evidence),providerSummary:out.providerSummary},evidence:out.evidence};}

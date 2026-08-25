@@ -1,0 +1,2 @@
+import { providerHealth } from './provider-runtime.mjs';
+export function healthSnapshot(){const providers=providerHealth();const totals=providers.reduce((a,p)=>({requests:a.requests+p.requests,successes:a.successes+p.successes,failures:a.failures+p.failures}),{requests:0,successes:0,failures:0});return {status:totals.failures===0?'healthy':totals.successes>totals.failures?'degraded':'unhealthy',totals,providers,generatedAt:new Date().toISOString()};}
